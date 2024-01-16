@@ -474,7 +474,11 @@ export class PPOMController extends BaseControllerV2<
    * The function adds new network to chainStatus list.
    */
   #onNetworkChange(networkControllerState: any): void {
-    const id = addHexPrefix(networkControllerState.providerConfig.chainId);
+    if (networkControllerState.networkStatus != "available") {
+      return
+    }
+
+    const id = addHexPrefix(parseInt(networkControllerState.providerConfig.chainId).toString(16));
     this.#chainId = id;
     let chainStatus = { ...this.state.chainStatus };
     const existingNetworkObject = chainStatus[id];
