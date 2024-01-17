@@ -1,6 +1,6 @@
+import CryptoJS, { SHA256 } from 'crypto-js';
 import elliptic from 'elliptic';
 import IdIterator from 'json-rpc-random-id';
-import sha256, { Hash, HMAC } from 'fast-sha256';
 
 const EdDSA = elliptic.eddsa;
 const URL_PREFIX = 'https://';
@@ -68,9 +68,7 @@ const getHash = async (data: ArrayBuffer, useNative: boolean): Promise<any> => {
       .join('');
     return hash;
   }
-  const dataArray = new Uint8Array(data);
-  // eslint-disable-next-line no-restricted-globals
-  return Buffer.from(sha256(dataArray)).toString('hex');
+  return SHA256(CryptoJS.lib.WordArray.create(data as any)).toString();
 };
 
 // useNative argument is added for testing purpose, without it test cases are breaking in Node-20 and above
