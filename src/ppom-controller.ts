@@ -485,7 +485,7 @@ export class PPOMController extends BaseControllerV2<
    * 2. instantiate PPOM for new network if user has enabled security alerts
    */
   #onNetworkChange(networkControllerState: any): void {
-    const id = addHexPrefix(networkControllerState.providerConfig.chainId);
+    const id = addHexPrefix(parseInt(networkControllerState.providerConfig.chainId).toString(16));
     if (id === this.#chainId) {
       return;
     }
