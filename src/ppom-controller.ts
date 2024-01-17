@@ -220,6 +220,8 @@ export class PPOMController extends BaseControllerV2<
 
   #ppomInitialised = false;
 
+  #fetchCallback: null | ((url: string) => Promise<ArrayBuffer>);
+
   /**
    * Creates a PPOMController instance.
    *
@@ -237,6 +239,7 @@ export class PPOMController extends BaseControllerV2<
    * @param options.fileFetchScheduleDuration - Duration after which next data file is fetched.
    * @param options.state - Initial state of the controller.
    * @param options.blockaidPublicKey - Public key of blockaid for verifying signatures of data files.
+   * @param options.fetchCallback - Callback to be used for fetching files.
    * @returns The PPOMController instance.
    */
   constructor({
@@ -253,6 +256,7 @@ export class PPOMController extends BaseControllerV2<
     fileFetchScheduleDuration,
     state,
     blockaidPublicKey,
+    fetchCallback,
   }: {
     chainId: string;
     messenger: PPOMControllerMessenger;
@@ -267,6 +271,7 @@ export class PPOMController extends BaseControllerV2<
     fileFetchScheduleDuration?: number;
     state?: PPOMState;
     blockaidPublicKey: string;
+    fetchCallback?: (url: string) => Promise<ArrayBuffer>;
   }) {
     const currentChainId = addHexPrefix(chainId);
     const initialState = {
@@ -325,6 +330,8 @@ export class PPOMController extends BaseControllerV2<
     if (securityAlertsEnabled) {
       this.#setToActiveState();
     }
+
+    this.#fetchCallback = fetchCallback ?? null;
   }
 
   /**
@@ -485,7 +492,9 @@ export class PPOMController extends BaseControllerV2<
    * 2. instantiate PPOM for new network if user has enabled security alerts
    */
   #onNetworkChange(networkControllerState: any): void {
-    const id = addHexPrefix(parseInt(networkControllerState.providerConfig.chainId).toString(16));
+    const id = addHexPrefix(
+      parseInt(networkControllerState.providerConfig.chainId).toString(16),
+    );
     if (id === this.#chainId) {
       return;
     }
@@ -575,12 +584,26 @@ export class PPOMController extends BaseControllerV2<
    * prepares instance of PPOM by passing files of selected network to it.
    */
   async #initPPOMWithFiles(): Promise<void> {
+    const startTime = new Date().getTime();
+    let time = new Date().getTime();
     if (!blockaidValidationSupportedForNetwork(this.#chainId)) {
       return;
     }
+    time = new Date().getTime();
     await this.#resetPPOM();
+    console.log(`+ Time taken to reset PPOM: ${new Date().getTime() - time}ms`);
+    time = new Date().getTime();
     this.#updateVersionInfoForChainId(this.#chainId);
+    console.log(
+      `+ Time taken to update version info: ${new Date().getTime() - time}ms`,
+    );
+    time = new Date().getTime();
     this.#ppom = await this.#getPPOM(this.#chainId);
+    console.log(`+ Time taken to get PPOM: ${new Date().getTime() - time}ms`);
+
+    console.log(
+      `! initPPOMWithFiles start to end: ${new Date().getTime() - startTime}ms`,
+    );
   }
 
   /*
@@ -656,6 +679,7 @@ export class PPOMController extends BaseControllerV2<
     fileVersionInfo: PPOMFileVersion,
   ): Promise<ArrayBuffer | undefined> {
     const { storageMetadata } = this.state;
+    let time = new Date().getTime();
     // do not fetch file if the storage version is latest
     if (this.#checkFilePresentInStorage(storageMetadata, fileVersionInfo)) {
       try {
@@ -665,23 +689,39 @@ export class PPOMController extends BaseControllerV2<
         );
       } catch (error: unknown) {
         console.error(`Error in reading file: ${(error as Error).message}`);
+      } finally {
+        console.log(
+          `+++ Time taken to read file from storage: ${
+            new Date().getTime() - time
+          }ms`,
+        );
       }
     }
+    time = new Date().getTime();
     // validate file path for valid characters
     checkFilePath(fileVersionInfo.filePath);
     const fileUrl = constructURLHref(
       this.#cdnBaseUrl,
       fileVersionInfo.filePath,
     );
-    const fileData = await this.#fetchBlob(fileUrl);
 
+    const fileData = await this.#fetchBlob(fileUrl);
+    console.log(
+      `+++ Time taken to fetch file: ${new Date().getTime() - time}ms`,
+    );
+
+    time = new Date().getTime();
     await validateSignature(
       fileData,
       fileVersionInfo.hashSignature,
       this.#blockaidPublicKey,
       fileVersionInfo.filePath,
     );
+    console.log(
+      `+++ Time taken to validate signature: ${new Date().getTime() - time}ms`,
+    );
 
+    time = new Date().getTime();
     try {
       await this.#storage.writeFile({
         data: fileData,
@@ -690,6 +730,12 @@ export class PPOMController extends BaseControllerV2<
     } catch (error: unknown) {
       console.error(`Error in writing file: ${(error as Error).message}`);
     }
+
+    console.log(
+      `+++ Time taken to write file to storage: ${
+        new Date().getTime() - time
+      }ms`,
+    );
 
     return fileData;
   }
@@ -962,8 +1008,26 @@ export class PPOMController extends BaseControllerV2<
    * Fetch the blob file from the PPOM cdn.
    */
   async #fetchBlob(url: string): Promise<ArrayBuffer> {
+    // if (this.#fetchCallback) {
+    //   console.log('++++ Fetching file using callback');
+    //   return await this.#fetchCallback(url);
+    // }
+
+    let time = new Date().getTime();
     const response = await this.#getAPIResponse(url);
-    return await response.arrayBuffer();
+    console.log(
+      `++++ Time taken to fetch blob file: ${new Date().getTime() - time}ms`,
+    );
+    time = new Date().getTime();
+    try {
+      return await response.arrayBuffer();
+    } finally {
+      console.log(
+        `++++ Time taken to convert blob to array buffer: ${
+          new Date().getTime() - time
+        }ms`,
+      );
+    }
   }
 
   /*
@@ -1018,7 +1082,11 @@ export class PPOMController extends BaseControllerV2<
   async #getPPOM(chainId: string): Promise<any> {
     // PPOM initialisation in contructor fails for react native
     // thus it is added here to prevent validation from failing.
+    let time = new Date().getTime();
     await this.#initialisePPOM();
+    console.log(
+      `++ Time taken to initialise PPOM: ${new Date().getTime() - time}ms`,
+    );
     const { chainStatus } = this.state;
     const versionInfo = chainStatus[chainId]?.versionInfo;
 
@@ -1033,7 +1101,11 @@ export class PPOMController extends BaseControllerV2<
     }
 
     // Get all the files for  the chainId
+    time = new Date().getTime();
     const files = await this.#getAllFiles(versionInfo);
+    console.log(
+      `++ Time taken to get all files: ${new Date().getTime() - time}ms`,
+    );
 
     if (files?.length !== versionInfo?.length) {
       throw new Error(
@@ -1041,10 +1113,17 @@ export class PPOMController extends BaseControllerV2<
       );
     }
 
-    return await this.#ppomMutex.use(async () => {
-      const { PPOM } = this.#ppomProvider;
-      return PPOM.new(this.#jsonRpcRequest.bind(this), files);
-    });
+    time = new Date().getTime();
+    try {
+      return await this.#ppomMutex.use(async () => {
+        const { PPOM } = this.#ppomProvider;
+        return PPOM.new(this.#jsonRpcRequest.bind(this), files);
+      });
+    } finally {
+      console.log(
+        `++ Time taken to call PPOM.new: ${new Date().getTime() - time}ms`,
+      );
+    }
   }
 
   /**

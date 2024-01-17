@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
+    "builder": "tsc --project tsconfig.build.json && cp -R dist /Users/avivm/Workspace/git/metamask-mobile/node_modules/@metamask/ppom-validator/ ; cp -R node_modules /Users/avivm/Workspace/git/metamask-mobile/node_modules/@metamask/ppom-validator/",
     "build:clean": "rimraf dist && yarn build",
     "build:docs": "typedoc",
     "lint": "yarn lint:eslint && yarn lint:constraints && yarn lint:misc --check && yarn lint:dependencies --check && yarn lint:changelog",
@@ -38,7 +39,8 @@
     "crypto-js": "^4.2.0",
     "elliptic": "^6.5.4",
     "eslint-plugin-n": "^16.6.2",
-    "json-rpc-random-id": "^1.0.1"
+    "json-rpc-random-id": "^1.0.1",
+    "stream": "^0.0.2"
   },
   "devDependencies": {
     "@lavamoat/allow-scripts": "^2.3.1",

@@ -1,6 +1,7 @@
-import CryptoJS, { SHA256 } from 'crypto-js';
+// import CryptoJS, { SHA256 } from 'crypto-js';
 import elliptic from 'elliptic';
 import IdIterator from 'json-rpc-random-id';
+
 
 const EdDSA = elliptic.eddsa;
 const URL_PREFIX = 'https://';
@@ -68,7 +69,9 @@ const getHash = async (data: ArrayBuffer, useNative: boolean): Promise<any> => {
       .join('');
     return hash;
   }
-  return SHA256(CryptoJS.lib.WordArray.create(data as any)).toString();
+
+  return (globalThis.Crypto as any).createHash('sha256').update(data).digest('hex');
+
 };
 
 // useNative argument is added for testing purpose, without it test cases are breaking in Node-20 and above
@@ -81,12 +84,22 @@ export const validateSignature = async (
   filePath: string,
   useNative = true,
 ) => {
+  let time = Date.now();
   const hashString = await getHash(data, useNative);
+  console.log(`Time taken to get hash: ${Date.now() - time}ms`);
   // const hashString = hash.toString();
+  time = Date.now();
   const ec = new EdDSA('ed25519');
+  console.log(`Time taken to create EdDSA: ${Date.now() - time}ms`);
+
+  time = Date.now();
   const ecKey = ec.keyFromPublic(key);
+  console.log(`Time taken to create ecKey: ${Date.now() - time}ms`);
+
+  time = Date.now();
   // eslint-disable-next-line no-restricted-globals
   const result = ecKey.verify(Buffer.from(hashString), hashSignature);
+  console.log(`Time taken to verify signature: ${Date.now() - time}ms`);
   if (!result) {
     throw Error(`Signature verification failed for file path: ${filePath}`);
   }
