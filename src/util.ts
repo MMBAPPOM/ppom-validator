@@ -68,6 +68,15 @@ const getHash = async (data: ArrayBuffer, useNative: boolean): Promise<any> => {
       .join('');
     return hash;
   }
+
+  if ('reactNativeCrypto' in globalThis && useNative) {
+    // reactNativeCrypto is a global variable injected by `Engine.ts` in metamask-mobile
+    return (globalThis as any).reactNativeCrypto
+      .createHash('sha256')
+      .update(data)
+      .digest('hex');
+  }
+
   return SHA256(CryptoJS.lib.WordArray.create(data as any)).toString();
 };
 
