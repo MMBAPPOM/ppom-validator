@@ -486,7 +486,6 @@ export class PPOMController extends BaseControllerV2<
    */
   #onNetworkChange(networkControllerState: any): void {
     const id = addHexPrefix(networkControllerState.providerConfig.chainId);
-
     if (id === this.#chainId) {
       return;
     }
